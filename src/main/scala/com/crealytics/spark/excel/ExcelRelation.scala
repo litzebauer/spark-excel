@@ -4,17 +4,9 @@ import java.math.BigDecimal
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
 
+import com.monitorjbl.xlsx.StreamingReader
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.poi.ss.usermodel.{
-  Cell,
-  CellType,
-  DataFormatter,
-  DateUtil,
-  Sheet,
-  Workbook,
-  WorkbookFactory,
-  Row => SheetRow
-}
+import org.apache.poi.ss.usermodel.{Cell, CellType, DataFormatter, DateUtil, Sheet, Workbook, Row => SheetRow}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
 import org.apache.spark.sql.sources._
@@ -32,14 +24,20 @@ case class ExcelRelation(
   userSchema: Option[StructType] = None,
   startColumn: Int = 0,
   endColumn: Int = Int.MaxValue,
-  timestampFormat: Option[String] = None
+  timestampFormat: Option[String] = None,
+  rowCacheSize: Option[Int] = Some(10),
+  bufferSize: Option[Int] = Some(1024)
 )(@transient val sqlContext: SQLContext)
     extends BaseRelation
     with TableScan
     with PrunedScan {
   private val path = new Path(location)
   private val inputStream = FileSystem.get(path.toUri, sqlContext.sparkContext.hadoopConfiguration).open(path)
-  private val workbook = WorkbookFactory.create(inputStream)
+  private val workbook = StreamingReader
+    .builder()
+    .rowCacheSize(rowCacheSize.get)
+    .bufferSize(bufferSize.get)
+    .open(inputStream)
   private val sheet = findSheet(workbook, sheetName)
   private lazy val firstRowWithData = sheet.asScala
     .find(_ != null)
