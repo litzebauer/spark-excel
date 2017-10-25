@@ -18,7 +18,6 @@ sparkComponents := Seq("core", "sql", "hive")
 
 libraryDependencies ++= Seq(
   "org.slf4j" % "slf4j-api" % "1.7.5" % "provided",
-  "org.apache.poi" % "poi-ooxml" % "3.16",
   "com.norbitltd" %% "spoiwo" % "1.2.0",
   "com.monitorjbl" % "xlsx-streamer" % "1.2.0"
 )

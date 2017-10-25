@@ -102,12 +102,28 @@ case class ExcelRelation(
     }
 
     val dataFormatter = new DataFormatter()
-    lazy val stringValue = dataFormatter.formatCellValue(cell)
+    lazy val stringValue =
+      cell.getCellTypeEnum match {
+        case CellType.FORMULA =>
+          cell.getCachedFormulaResultTypeEnum match {
+            case CellType.STRING => cell.getRichStringCellValue.getString.replaceAll("^\"|\"$", "")
+            case CellType.NUMERIC => cell.getNumericCellValue.toString.replaceAll("^\"|\"$", "")
+            case _ => dataFormatter.formatCellValue(cell)
+          }
+        case _ => dataFormatter.formatCellValue(cell)
+      }
     lazy val numericValue =
       cell.getCellTypeEnum match {
         case CellType.NUMERIC => cell.getNumericCellValue
         case CellType.STRING if cell.getStringCellValue != "" => cell.getStringCellValue.toDouble
         case CellType.STRING => Double.NaN
+        case CellType.FORMULA =>
+          cell.getCachedFormulaResultTypeEnum match {
+            case CellType.NUMERIC => cell.getNumericCellValue
+            case CellType.STRING if cell.getRichStringCellValue.getString.replaceAll("^\"|\"$", "") != "" =>
+              cell.getRichStringCellValue.getString.toDouble
+            case CellType.STRING => Double.NaN
+          }
       }
     lazy val bigDecimal = new BigDecimal(stringValue.replaceAll(",", ""))
     castType match {
@@ -160,7 +176,7 @@ case class ExcelRelation(
   private def inferSchema: StructType =
     this.userSchema.getOrElse {
       val header = firstRowWithData.zipWithIndex.map {
-        case (Some(value), _) if useHeader => value.getStringCellValue
+        case (Some(value), _) if useHeader => value.getStringCellValue.replaceAll("^\"|\"$", "")
         case (_, index) => s"C$index"
       }
       val baseSchema = if (this.inferSheetSchema) {
